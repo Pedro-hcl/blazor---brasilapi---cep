@@ -1,0 +1,122 @@
+﻿@page "/"
+@inject HttpClient Http
+@using BlazorWasmBrasilApiCep.Models
+
+<PageTitle>Consulta CEP - BrasilAPI</PageTitle>
+
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-header bg-primary text-white">
+                    <h4 class="mb-0">Consulta de CEP (BrasilAPI)</h4>
+                </div>
+                <div class="card-body">
+                    <!-- Formulário de Busca -->
+                    <div class="mb-3">
+                        <label for="cepInput" class="form-label">Digite o CEP:</label>
+                        <div class="input-group">
+                            <input id="cepInput" 
+                                   type="text" 
+                                   class="form-label form-control" 
+                                   placeholder="Ex: 89010025" 
+                                   maxlength="8" 
+                                   @bind="cepInput" />
+                            <button class="btn btn-primary" @onclick="ConsultarCep" disabled="@carregando">
+                                @if (carregando)
+                                {
+                                    <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+                                    <span> Buscando...</span>
+                                }
+                                else
+                                {
+                                    <span>Buscar</span>
+                                }
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Mensagem de Erro -->
+                    @if (!string.IsNullOrEmpty(mensagemErro))
+                    {
+                        <div class="alert alert-danger mt-3" role="alert">
+                            @mensagemErro
+                        </div>
+                    }
+                </div>
+            </div>
+
+            <!-- Resultado da Consulta -->
+            @if (cepResultado != null)
+            {
+                <div class="card shadow-sm mt-4">
+                    <div class="card-header bg-success text-white">
+                        <h5 class="mb-0">Resultado Encontrado</h5>
+                    </div>
+                    <div class="card-body">
+                        <p><strong>CEP:</strong> @cepResultado.Cep</p>
+                        <p><strong>Logradouro:</strong> @cepResultado.Street</p>
+                        <p><strong>Bairro:</strong> @cepResultado.Neighborhood</p>
+                        <p><strong>Cidade:</strong> @cepResultado.City</p>
+                        <p><strong>Estado:</strong> @cepResultado.State</p>
+                        <p><strong>Serviço:</strong> @cepResultado.Service</p>
+                        <hr />
+                        <h6>Informações IBGE</h6>
+                        <p><strong>Código Cidade IBGE:</strong> @cepResultado.Ibge?city</p>
+                        <p><strong>Código Estado IBGE:</strong> @cepResultado.Ibge?state</p>
+                    </div>
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@code {
+    private string cepInput = string.Empty;
+    private CepModel? cepResultado;
+    private string mensagemErro = string.Empty;
+    private bool carregando = false;
+
+    private async Task ConsultarCep()
+    {
+        // Limpa estados anteriores
+        mensagemErro = string.Empty;
+        cepResultado = null;
+
+        // Validação básica do input
+        var cepLimpo = new string(cepInput.Where(char.IsDigit).ToArray());
+
+        if (string.IsNullOrWhiteSpace(cepLimpo) || cepLimpo.Length != 8)
+        {
+            mensagemErro = "Por favor, digite um CEP válido com 8 dígitos.";
+            return;
+        }
+
+        carregando = true;
+
+        try
+        {
+            // Realiza a requisição GET para a BrasilAPI
+            cepResultado = await Http.GetFromJsonAsync<CepModel>($"https://brasilapi.com.br/api/cep/v1/{cepLimpo}");
+        }
+        catch (HttpRequestException ex)
+        {
+            if (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
+            {
+                mensagemErro = "CEP não encontrado na base de dados.";
+            }
+            else
+            {
+                mensagemErro = "Ocorreu um erro ao consultar o CEP. Tente novamente mais tarde.";
+            }
+        }
+        catch (Exception)
+        {
+            mensagemErro = "Erro inesperado ao processar a requisição.";
+        }
+        finally
+        {
+            carregando = false;
+        }
+    }
+}
